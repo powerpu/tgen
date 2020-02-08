@@ -242,7 +242,7 @@ func getData(res http.ResponseWriter, req *http.Request) (*fake.Data, []float64,
 	for i := 0; i < (samples + startAt); i++ {
 		data.Next()
 		if i == startAt-1 {
-			data.JsonStats()
+			data.JSONStats()
 		}
 		if i >= startAt {
 			vals[i-startAt] = data.Val().(float64)
@@ -262,7 +262,7 @@ func getData(res http.ResponseWriter, req *http.Request) (*fake.Data, []float64,
 func getStats(res http.ResponseWriter, req *http.Request) {
 	data, _, _ := getData(res, req)
 	res.Header().Set("Content-Type", "text/json")
-	res.Write([]byte(data.JsonStats()))
+	res.Write([]byte(data.JSONStats()))
 }
 
 func getChart(res http.ResponseWriter, req *http.Request) {

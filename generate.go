@@ -187,7 +187,7 @@ DATA
 
 Where:
 
- 'RANDOM' indicates a the literal word RANOM on its own line indicating that 
+ 'RANDOM' indicates a the literal word RANDOM on its own line indicating that 
          the lines that follow are loading random entries.
 
  'PATTERN' indicates a the literal word TIMES on its own line indicating that 
@@ -207,7 +207,7 @@ An example RANDOM entry may look like the following:
 
  r3,1,0.3,30% good
 
-For 'RANOM' the header/columns are as follows:
+For 'RANDOM' the header/columns are as follows:
 
  ID
     An id for this entry so that you can refer to it in the template like this
@@ -451,7 +451,7 @@ for what the data will look like.`)
 
 func printStats(i, stats int64, outW *bufio.Writer, parsedConfig map[string]fake.Value) {
 	for _, v := range parsedConfig {
-		outW.Write([]byte(v.JsonStats() + "\n"))
+		outW.Write([]byte(v.JSONStats() + "\n"))
 		outW.Flush()
 	}
 }
@@ -559,7 +559,7 @@ func loadOnePattern(line []string, keepStats bool) fake.Value {
 	check(err)
 	patternBad, err := strconv.ParseInt(line[2], 10, 32) // patternBad
 	check(err)
-	fp, err := fake.NewPattern(id, int32(patternGood), int32(patternBad), keepStats)
+	fp, err := fake.NewPattern(id, int(patternGood), int(patternBad), keepStats)
 	check(err)
 	return fp
 }
