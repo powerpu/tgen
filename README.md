@@ -4,7 +4,7 @@ Fake ***T***ime series data ***GEN***erator tool written in Go.
 
 Linux 64 bit binary is [here](tgen.linux.amd64.gz).
 
-Windows 64 bit binary is [here](tgen.windows.amd64.gz).
+Windows 64 bit binary is [here](tgen.windows.amd64.exe.gz).
 
 Or you can clone and use `go build` with your desired architecture. TGEN was
 built with `go version go1.13.3 linux/amd64`.
@@ -42,11 +42,75 @@ This tool implements all of the above requirements and uses the
 [go-fake-ts](https://github.com/powerpu/go-fake-ts) library which generates the
 underlying numbers.
 
-## Documentation
+## Concepts
 
-You can have a read through the
-[go-fake-ts](https://github.com/powerpu/go-fake-ts) documentation for some
-underlying concepts of the libary.
+*You can have a read through the [go-fake-ts
+library](https://github.com/powerpu/go-fake-ts) readme or the [Golang
+documentation](https://godoc.org/github.com/powerpu/go-fake-ts) documentation
+for some underlying concepts of the libary. They're summarised here for
+convenience.*
+
+The package breaks down time series data into two major parts, samples and the
+actual data.
+
+There is a distinctinction between "bad samples" and "bad data". 
+
+An example of the distinction would be in an example of collecting CPU and
+memory data from a server.
+
+In a "valid sample" the collection server would connect and retrieve this
+information from the destination server in a particular way with no issues.
+
+In a "bad sample" scenario, the destination server would be running fine but
+due to a network outage a sample would not be collected.
+
+In a "bad data" scenario, the destination server would be running and the
+network would be up but due to a rogue process the CPU value would not be able
+to be collected while memory could. The end result is that the CPU data is
+"bad".
+
+
+
+## Basics
+
+There are 4 types of objects one can create in the config. They are:
+
+ * **Random** - A true/false pattern that changes randomly (e.g. 5% true)
+
+ * **Pattern** - A true/false pattern that repeats (e.g. 2 true, 1 false)
+
+ * **Time** - Time one would plot on the X-axis of a time series graph (e.g.
+   steady 30 minute intervals)
+
+ * **Data** - Actual numbers one would plot as a feature/metric in a timeseries
+   graph (e.g. 0 to 100, going up)
+
+The general usage would be to instantiate define the types in the config file,
+design the relevant output data template and run the tool to generate the data.
+Refer to "Workflow" below for more info.
+
+Ultimately the goal is to generate time series data that may look as follows:
+
+```
+  Timestamp, CPU, Memory
+  1581039550,23.5,97.2
+  1581039650,26.5,84.9
+  ...etc...
+```
+
+One would use the true/false value of a Pattern or Random to determine what to
+print.
+
+An example simulation scenario could be generating data where every 24th hourly
+sample fails because you want to simulate a scheduled job taking up too many
+resources and thus not retrieving data.
+
+For this you would use a 23 good samples and 1 bad samples pattern with time
+going up by 1 hour intervals. 
+
+
+
+## Workflow
 
 The fundamental workflow of how you would use the tool is as follows:
 
@@ -76,6 +140,137 @@ The fundamental workflow of how you would use the tool is as follows:
     something else entirely.
 
  1. Use the tool to generate the fake data using `./tgen generate`.
+
+
+
+## Example Scenario
+
+Let's say we want to create the following scenario:
+
+ * Collect data from 3 rain sensors
+
+ * Collection frequency is 1 hour
+
+ * Sensor 1 is always perfect
+
+ * Sensor 2 is uncontactable (i.e. bad) 15% of the time
+
+ * Sensor 3 is always contactable but due to a bug cannot provide every 8th
+   sample
+
+What you would do in this scenario is create the following in your config:
+
+ * A `random` that will give us `true` 85% of the time (100% good - 15% bad = 85% good). This will be used for sensor 2.
+
+ * A `pattern` that will give us `true` 7 times and `false` 1 time. This will be used for Sensor 3.
+
+ * A `time` that will increment perfectly by 1 hour. This will be used for all Sensors.
+
+ * 3 different types of `data` to represent each sensors conditions/values.
+
+The config may look like this:
+
+```
+RANDOM
+ID,SEED,GOOD_PCT,DESCRIPTION
+r1,1,0.85,80% good
+PATTERN
+ID,PATTERN_GOOD,PATTERN_BAD,DESCRIPTION
+p1,7,1,7 good 1 bad
+TIMES
+ID,INCREMENT,VARIANCE,DIRECTION,DESCRIPTION
+t1,3600000,0,0,1 hour time no variance
+DATA
+ID,STRETCH_START,STRETCH_END,SLOPE,BUMP,FROM,TO,LIMIT_UPPER,LIMIT_LOWER,PERMA_BUMP_AT,PERMA_BUMP_BY,PERMA_BUMP_SMOOTHER,USE_RANDOM,RANDOM_SEED,RANDOM_BIAS,GENERATE_SPIKES,SPIKE_SUSTAIN,SPIKE_EVERY,SPIKE_TO,SPIKE_WOBBLE,SPIKE_WOBBLE_FACTOR,SPIKE_SMOOTHER,USE_SEASONALITY,SEASONALITY_WAVE1,SEASONALITY_WAVE2,SEASONALITY_WAVE3,SEASONALITY_WAVE4,SEASONALITY_WAVE5,DESCRIPTION
+d1,1,1,0,0,50,100,false,false,0,0,0,true,1,0.5,false,5,100,100,false,200,20,false,300,1,1,1,1,Random example
+d2,1,1,0,0,10,100,false,false,43,100,1,true,1,0.5,false,5,100,100,false,200,20,false,300,1,1,1,1,Random example with a permanent bump
+d3,1,1,0,0,30,100,false,false,0,0,0,false,1,0.5,false,5,100,100,false,200,20,true,300,1,1,1,1,Seasonality example
+```
+
+Parameters are explained in the "Help for 'Generate'" below and in the 
+[NewData function Godoc](https://godoc.org/github.com/powerpu/go-fake-ts#NewData) 
+documentation of the [go-fake-ts](https://github.com/powerpu/go-fake-ts) library.
+
+You would also normally use `./tgen playarea` to help you generate the desired
+config for `DATA` since it can accept many parameters.
+
+Let's say you want to generate a simple CSV that may look like this:
+
+```
+SensorName,Timestamp,  mmPerHour
+Sensor-1,  1580000000, 23.5
+Sensor-2,  1580000000, 6.5
+Sensor-3,  1580000000, 0.1
+Sensor-1,  1580003600, 23.5
+Sensor-2,  1580003600, 6.5
+Sensor-3,  1580003600, <missing>
+Sensor-1,  1580007200, 23.5
+Sensor-3,  1580007200, 0.1
+...etc...
+```
+
+Notice how `Sensor-3` has "bad data" at `1580003600` while `Sensor-2` has a
+"bad sample" `1580007200` (i.e. it's actually missing).
+
+Your Golang template for this example would look like this:
+
+```
+Sensor-1,{{ $.t1.Val.Unix }},{{ $.d1.Val }}
+{{- if $.r1.Val }}
+Sensor-2,{{ $.t1.Val.Unix }},{{ $.d2.Val }}
+{{- end }}
+Sensor-3,{{ $.t1.Val.Unix }},{{ if $.p1.Val }}{{ $.d3.Val }}{{ else }}<missing>{{ end }}
+```
+
+You would then run `./tgen generate -c example.conf -t example.template` and
+would see the following:
+
+```
+Sensor-1,1582258623,-74.37104824258068
+Sensor-3,1582258623,66.3612572924182
+Sensor-1,1582262223,-74.41366470389394
+Sensor-2,1582262223,-54.57002078285556
+Sensor-3,1582262223,67.72191749239796
+Sensor-1,1582265823,-74.40755940656285
+Sensor-2,1582265823,-54.56554356481276
+Sensor-3,1582265823,69.08138376940538
+Sensor-1,1582269423,-74.39862143076873
+Sensor-2,1582269423,-54.558989049230405
+Sensor-3,1582269423,70.4390598166005
+Sensor-1,1582273023,-74.45354889738809
+Sensor-2,1582273023,-54.59926919141793
+Sensor-3,1582273023,71.79435011239748
+Sensor-1,1582276623,-74.15663251792097
+Sensor-2,1582276623,-54.381530513142046
+Sensor-3,1582276623,73.14666018167978
+Sensor-1,1582280223,-73.97096610806699
+Sensor-2,1582280223,-54.245375145915794
+Sensor-3,1582280223,<missing>
+Sensor-1,1582283823,-73.71534051521435
+Sensor-2,1582283823,-54.05791637782386
+Sensor-3,1582283823,75.83996853654665
+Sensor-1,1582287423,-73.6529642565065
+Sensor-2,1582287423,-54.012173788104754
+Sensor-3,1582287423,77.1797854480721
+Sensor-1,1582291023,-73.6533284540953
+Sensor-2,1582291023,-54.01244086633656
+Sensor-3,1582291023,78.51425990315435
+```
+
+This generates 10 samples by default, which is 30 lines since the template
+represents one sample (actually 29 in our example since one sample is missing).
+
+There are many other options you can pass. Refer to "Help for 'Generate'" below
+for more parameters you could pass.
+
+For example if you want to generate a continuous stream of numbers with a 1
+second delay you would run the following:
+
+```
+./tgen generate -c example.conf -t example.template -s -r 1000
+```
+
+## Embedded Documentation
 
 The tool also has documentation embedded in itself and is shown below.
 
@@ -490,3 +685,9 @@ Flags:
   -p, --port int   Port to use for playarea server. (default 8080)
 ```
 
+Once you open your browser you will be greeted with a page that looks like this:
+
+![Playarea screencap](playarea-screenshot.png)
+
+A word of warning though, the page has been awarded "best webpage design" in
+the 1997 international web design awards.
